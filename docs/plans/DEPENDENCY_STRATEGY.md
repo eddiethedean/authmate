@@ -2,7 +2,7 @@
 
 ## Principle
 
-AuthMate should own identity, authorization, credential, and service-account domain semantics while delegating commodity security mechanics to mature libraries.
+AuthMate should own identity, authorization, credential, and service-account domain semantics while delegating commodity security and pagination mechanics to mature libraries.
 
 > **Own the contracts; reuse the mechanics.**
 
@@ -10,6 +10,7 @@ AuthMate should own identity, authorization, credential, and service-account dom
 
 ```text
 fastapi
+fastapi-pagination
 pydantic
 pydantic-settings
 sqlmodel
@@ -19,6 +20,16 @@ pwdlib[argon2]
 itsdangerous
 cryptography
 ```
+
+## fastapi-pagination
+
+Use `fastapi-pagination` for bounded collection APIs such as users, roles, service accounts, credentials, grants, sessions where applicable, and audit events.
+
+AuthMate owns authorization, filtering rules, resource visibility, and response semantics. `fastapi-pagination` owns pagination mechanics and SQLModel/SQLAlchemy integration.
+
+Pagination must occur after authorization/query scoping so totals and page contents cannot leak records the principal is not allowed to discover.
+
+Do not expose dependency-specific implementation types as AuthMate domain contracts.
 
 ### pwdlib[argon2]
 Use for password hashing and verification. AuthMate owns password lifecycle and policy; `pwdlib` owns hashing mechanics.
@@ -44,6 +55,8 @@ Package as `authmate[casbin]` for advanced authorization behind the stable `Auth
 
 FastAPI Users is useful to study for registration/reset/verification/authentication patterns, but AuthMate should not be architected around its internals.
 
+AuthX may be studied for JWT/cookie/CSRF/token handling patterns but is not a core dependency because it overlaps AuthMate's domain responsibilities.
+
 ## Rules
 
 - Public AuthMate contracts never expose third-party implementation types.
@@ -62,6 +75,6 @@ Keep direct `sqlalchemy` available for low-level session/transaction/query/secur
 
 Python package dependencies are allowed when they run in-process. The restriction applies to **external infrastructure/services**, not libraries.
 
-Allowed defaults include FastAPI, Pydantic, SQLModel, SQLAlchemy, cryptography, and other in-process libraries.
+Allowed defaults include FastAPI, `fastapi-pagination`, Pydantic, SQLModel, SQLAlchemy, cryptography, and other in-process libraries.
 
 Redis, RabbitMQ, Kafka, OpenSearch/Elasticsearch, object storage, Vault/cloud secret managers, external schedulers, and separate workers cannot be required baseline infrastructure. Optional adapters may support them.
