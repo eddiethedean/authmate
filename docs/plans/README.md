@@ -11,7 +11,7 @@ work standalone and as a first-class companion to **Hedron** and
 
 ## Ecosystem boundary
 
-``` text
+```text
 Hedron    -> presentation / UI
 AuthMate  -> identity / authorization / credentials
 ShuETL    -> pipeline control plane
@@ -22,18 +22,29 @@ AuthMate core must contain no Hedron or ShuETL domain logic.
 Integrations use public protocols, FastAPI dependencies, and optional
 adapters.
 
-## Documents
+## Core principles
 
-VISION, ARCHITECTURE, IDENTITY_AND_AUTHORIZATION,
-CREDENTIALS_AND_SECRETS, API_DESIGN, HEDRON_INTEGRATION,
-SHUETL_INTEGRATION, SECURITY_AND_AUDIT, MVP, ROADMAP, and
-DESIGN_DECISIONS.
-
-## Dependency philosophy
+> **Independent by default, composable by contract.**
 
 > **Own the contracts; reuse the mechanics.**
 
-AuthMate should use mature libraries for password hashing, cryptography, OAuth/OIDC, configuration, and optional policy evaluation while keeping its own stable domain contracts.
+> **Secure defaults, extensible by contract.**
+
+> **Extensibility must never weaken security invariants implicitly.**
+
+AuthMate is intentionally customizable without forks. Major capabilities should expose typed extension surfaces while AuthMate preserves security-critical invariants.
+
+## Documents
+
+VISION, ARCHITECTURE, IDENTITY_AND_AUTHORIZATION,
+CREDENTIALS_AND_SECRETS, EXTENSIBILITY, API_DESIGN, HEDRON_INTEGRATION,
+SHUETL_INTEGRATION, SECURITY_AND_AUDIT, MVP, ROADMAP,
+DESIGN_DECISIONS, DEPENDENCY_STRATEGY, PYDANTIC_STRATEGY, and
+FASTAPI_STRATEGY.
+
+## Dependency philosophy
+
+AuthMate should use mature libraries for password hashing, cryptography, OAuth/OIDC, configuration, pagination, and optional policy evaluation while keeping its own stable domain contracts.
 
 See `DEPENDENCY_STRATEGY.md`.
 
@@ -41,7 +52,7 @@ See `DEPENDENCY_STRATEGY.md`.
 
 Pydantic is a first-class architectural dependency, not merely FastAPI request validation.
 
-Public domain models, configuration, discriminated unions, validation, serialization boundaries, and generated JSON Schema should use Pydantic wherever appropriate.
+Public domain models, configuration, discriminated unions, validation, serialization boundaries, extension payloads, and generated JSON Schema should use Pydantic wherever appropriate.
 
 See `PYDANTIC_STRATEGY.md`.
 
@@ -64,3 +75,11 @@ No Redis, RabbitMQ, Kafka, Elasticsearch/OpenSearch, object store, Vault, extern
 Additional services may only extend scale, interoperability, or specialized functionality.
 
 For local development, SQLite should remain sufficient wherever practical.
+
+## Extensibility
+
+AuthMate should support controlled extension of user/service-account/group metadata, token claims, authenticators, authorization providers, credential types, secret providers, audit metadata, and lifecycle behavior.
+
+Developer-extensible SQLModel persistence should pair with AuthMate-managed Alembic migrations so safe schema additions can be applied without requiring normal use of the Alembic CLI.
+
+See `EXTENSIBILITY.md`.
