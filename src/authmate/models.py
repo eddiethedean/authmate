@@ -73,6 +73,24 @@ def _require_non_nil(value: UUID, *, field_name: str) -> UUID:
     return value
 
 
+def _reject_non_json_uuid(value: object, *, field_name: str) -> object:
+    if not isinstance(value, (UUID, str)):
+        raise ValueError(f"{field_name} must be a UUID or string")
+    return value
+
+
+def _reject_non_json_enum(value: object, *, field_name: str) -> object:
+    if not isinstance(value, (str, StrEnum)):
+        raise ValueError(f"{field_name} must be a string")
+    return value
+
+
+def _reject_non_json_datetime(value: object, *, field_name: str) -> object:
+    if not isinstance(value, (datetime, str)):
+        raise ValueError(f"{field_name} must be a datetime or string")
+    return value
+
+
 def _as_utc(value: datetime, *, field_name: str) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError(f"{field_name} must be timezone-aware")
@@ -92,10 +110,20 @@ class PrincipalRef(AuthMateModel):
     id: UUID
     kind: PrincipalKind
 
+    @field_validator("id", mode="before")
+    @classmethod
+    def reject_coercive_id(cls, value: object) -> object:
+        return _reject_non_json_uuid(value, field_name="id")
+
     @field_validator("id")
     @classmethod
     def validate_id(cls, value: UUID) -> UUID:
         return _require_non_nil(value, field_name="id")
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def reject_coercive_kind(cls, value: object) -> object:
+        return _reject_non_json_enum(value, field_name="kind")
 
 
 class PrincipalRecord(AuthMateModel):
@@ -116,6 +144,13 @@ class PrincipalRecord(AuthMateModel):
     @classmethod
     def normalize_expiry(cls, value: datetime | None) -> datetime | None:
         return None if value is None else _as_utc(value, field_name="expires_at")
+
+    @field_validator("expires_at", mode="before")
+    @classmethod
+    def reject_coercive_expiry(cls, value: object) -> object:
+        if value is None:
+            return None
+        return _reject_non_json_datetime(value, field_name="expires_at")
 
 
 class ResourceRef(AuthMateModel):
@@ -166,6 +201,11 @@ class AuthorizationDecision(AuthMateModel):
     resource: ResourceRef | None = None
     policy_revision: StrictStr | None = Field(default=None, min_length=1, max_length=128)
 
+    @field_validator("reason", mode="before")
+    @classmethod
+    def reject_coercive_reason(cls, value: object) -> object:
+        return _reject_non_json_enum(value, field_name="reason")
+
     @field_validator("policy_revision")
     @classmethod
     def validate_policy_revision(cls, value: str | None) -> str | None:
@@ -188,6 +228,11 @@ class CredentialRef(AuthMateModel):
     """Opaque credential identifier reserved for later resolver integration."""
 
     id: UUID
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def reject_coercive_id(cls, value: object) -> object:
+        return _reject_non_json_uuid(value, field_name="id")
 
     @field_validator("id")
     @classmethod
@@ -229,10 +274,25 @@ class AuditEvent(AuthMateModel):
     reason_code: StrictStr | None = Field(default=None, min_length=1, max_length=100)
     correlation_id: CorrelationId | None = None
 
+    @field_validator("id", mode="before")
+    @classmethod
+    def reject_coercive_id(cls, value: object) -> object:
+        return _reject_non_json_uuid(value, field_name="id")
+
     @field_validator("id")
     @classmethod
     def validate_id(cls, value: UUID) -> UUID:
         return _require_non_nil(value, field_name="id")
+
+    @field_validator("outcome", mode="before")
+    @classmethod
+    def reject_coercive_outcome(cls, value: object) -> object:
+        return _reject_non_json_enum(value, field_name="outcome")
+
+    @field_validator("occurred_at", mode="before")
+    @classmethod
+    def reject_coercive_occurred_at(cls, value: object) -> object:
+        return _reject_non_json_datetime(value, field_name="occurred_at")
 
     @field_validator("occurred_at")
     @classmethod

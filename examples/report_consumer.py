@@ -54,6 +54,7 @@ class Policy:
 
 
 def build_app(actor: PrincipalRef | None = None) -> FastAPI:
+    # This fixed context dependency is trusted demo wiring, not authentication.
     actor = actor or PrincipalRef(id=uuid4(), kind=PrincipalKind.USER)
     service = AuthMate(principal_provider=Principals(), authorization_provider=Policy(actor))
     security = AuthMateSecurity(service, context_dependency=lambda: AccessContext(actor=actor))

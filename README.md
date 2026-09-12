@@ -3,7 +3,8 @@
 AuthMate is a provider-neutral authorization boundary for Python services. Version
 0.1.0 is a stateless contract preview: it validates shared values, coordinates
 principal and authorization providers, and supplies a small FastAPI adapter. It
-does not authenticate requests, persist data, or resolve real credentials.
+does not authenticate requests, persist data, implement RBAC, manage credentials,
+or provide a production-readiness guarantee.
 
 > Independent by default, composable by contract.
 

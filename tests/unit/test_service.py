@@ -188,6 +188,50 @@ async def test_invalid_and_mismatched_provider_values_are_denied() -> None:
     assert result.reason.value == "provider_contract_violation"
     await service.aclose()
 
+
+@pytest.mark.asyncio
+async def test_wrong_provider_objects_cannot_become_valid_models() -> None:
+    record = principal()
+    resource = ResourceRef(type="report.document", id="r-1")
+
+    class ModelDumpingObject:
+        def __init__(self, payload: object) -> None:
+            self.payload = payload
+
+        def model_dump(self, *, mode: str) -> object:
+            return self.payload
+
+    service = AuthMate(
+        principal_provider=FakePrincipalProvider(
+            ModelDumpingObject(record.model_dump(mode="python"))
+        ),
+        authorization_provider=FakeAuthorizationProvider(None),
+    )
+    result = await service.authorize(
+        context=AccessContext(actor=record.ref), action="report.read", resource=resource
+    )
+    assert result.reason is DecisionReason.PROVIDER_CONTRACT_VIOLATION
+    await service.aclose()
+
+    service = AuthMate(
+        principal_provider=FakePrincipalProvider(record),
+        authorization_provider=FakeAuthorizationProvider(
+            ModelDumpingObject(
+                AuthorizationDecision(
+                    allowed=True,
+                    reason=DecisionReason.ALLOWED,
+                    action="report.read",
+                    resource=resource,
+                ).model_dump(mode="python")
+            )
+        ),
+    )
+    result = await service.authorize(
+        context=AccessContext(actor=record.ref), action="report.read", resource=resource
+    )
+    assert result.reason is DecisionReason.PROVIDER_CONTRACT_VIOLATION
+    await service.aclose()
+
     wrong = principal()
     service = AuthMate(
         principal_provider=FakePrincipalProvider(wrong),

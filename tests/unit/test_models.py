@@ -1,4 +1,6 @@
+from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -97,3 +99,48 @@ def test_remaining_validation_boundaries() -> None:
             outcome=AuditOutcome.FAILED,
             reason_code="Bad.Code",
         )
+
+
+@pytest.mark.parametrize(
+    ("label", "factory"),
+    [
+        (
+            "principal id bytes",
+            lambda ref: PrincipalRef(id=ref.id.bytes, kind=cast(Any, "user")),
+        ),
+        (
+            "principal kind bytes",
+            lambda ref: PrincipalRef(id=ref.id, kind=cast(Any, b"user")),
+        ),
+        (
+            "principal expiry bytes",
+            lambda ref: PrincipalRecord(
+                ref=ref,
+                display_name="Ada",
+                enabled=True,
+                expires_at=cast(Any, b"2030-01-01T00:00:00Z"),
+            ),
+        ),
+        (
+            "decision reason bytes",
+            lambda ref: AuthorizationDecision(
+                allowed=True, reason=cast(Any, b"allowed"), action="report.read"
+            ),
+        ),
+        (
+            "audit timestamp integer",
+            lambda ref: AuditEvent(
+                id=uuid4(),
+                event_type="authorization.checked",
+                occurred_at=cast(Any, 0),
+                outcome=cast(Any, "succeeded"),
+            ),
+        ),
+    ],
+)
+def test_coercive_primitive_types_are_rejected(
+    label: str, factory: Callable[[PrincipalRef], object]
+) -> None:
+    ref = PrincipalRef(id=uuid4(), kind=PrincipalKind.USER)
+    with pytest.raises(ValidationError):
+        factory(ref)

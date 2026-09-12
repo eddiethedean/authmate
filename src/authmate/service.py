@@ -139,6 +139,12 @@ class AuthMate:
 
         if record is None:
             return self._deny(valid_action, resource, DecisionReason.PRINCIPAL_NOT_FOUND)
+        if not isinstance(record, PrincipalRecord):
+            return self._deny(
+                valid_action,
+                resource,
+                DecisionReason.PROVIDER_CONTRACT_VIOLATION,
+            )
         try:
             record = PrincipalRecord.model_validate(record.model_dump(mode="python"))
         except (AttributeError, TypeError, ValidationError) as exc:
@@ -165,6 +171,12 @@ class AuthMate:
         except _ProviderUnavailable:
             return self._deny(valid_action, resource, DecisionReason.PROVIDER_UNAVAILABLE)
 
+        if not isinstance(decision, AuthorizationDecision):
+            return self._deny(
+                valid_action,
+                resource,
+                DecisionReason.PROVIDER_CONTRACT_VIOLATION,
+            )
         try:
             decision = AuthorizationDecision.model_validate(decision.model_dump(mode="python"))
         except (AttributeError, TypeError, ValidationError) as exc:
