@@ -1,78 +1,71 @@
-# Initial Design Decisions
+# Design Decisions
 
-1. **Separate package** — AuthMate is not embedded in Hedron or ShuETL.
-2. **FastAPI-native** — FastAPI dependencies and routers are first-class public surfaces.
-3. **Generic resources** — consumer packages define resource namespaces without AuthMate domain knowledge.
-4. **Unified principals** — users and service accounts share the authorization model.
-5. **RBAC first** — roles + permissions + scopes before any general policy language.
-6. **Credential/secret separation** — persistent credentials reference secret providers.
-7. **Late resolution** — secrets resolve only when an authorized operation needs them.
-8. **No UI authority** — Hedron visibility never replaces server authorization.
-9. **Protocol-based ShuETL integration** — ShuETL depends on public interfaces, not ORM models.
-10. **Shared DB allowed, ownership separate** — AuthMate owns `authmate_*` tables/migrations.
-11. **SQLite local, PostgreSQL reference production backend.**
-12. **Compatibility is a release gate** — Hedron + AuthMate + ShuETL is tested as a supported composition.
-13. **Secure defaults, extensible by contract** — major capabilities expose typed extension surfaces without requiring forks.
-14. **Security invariants remain authoritative** — extension hooks cannot implicitly weaken reserved security semantics.
+Status: planning decisions, not implemented guarantees. This register supersedes
+contradictory wording in earlier drafts. [MVP](MVP.md) defines release evidence.
 
-## Open ADRs
+| ID | Decision |
+| --- | --- |
+| D01 | AuthMate is a standalone embeddable package, independent of consumers. |
+| D02 | FastAPI adapters are first-class; domain services also work without HTTP. |
+| D03 | Consumers register generic action/resource contracts; core owns no consumer domain. |
+| D04 | Users/service accounts share immutable principal identities and authorization. |
+| D05 | RBAC uses explicit realm/type/exact scopes; no MVP inheritance, groups, or wildcard strings. |
+| D06 | Credential policy and secret material are separate; use requires one exact grant. |
+| D07 | Resolve late, recheck state, commit release audit, and never persist resolved values. |
+| D08 | UI visibility is advisory; server services enforce current authority. |
+| D09 | Consumers adapt to AuthMate's public protocols; core does not adapt to their internals. |
+| D10 | Shared databases retain explicit table and migration ownership. |
+| D11 | SQLite is for local development; PostgreSQL is the production reference. |
+| D12 | Core releases require generic conformance tests; real integration gates belong to consumer adapters. |
+| D13 | Typed extensions support customization without forks within a stated release scope. |
+| D14 | Reuse maintained security mechanics; optional features bring optional dependencies. |
+| D15 | Pydantic public contracts are separate from ORM and provider objects. |
+| D16 | SQLModel handles ordinary internal tables; SQLAlchemy handles advanced persistence and transactions. |
+| D17 | FastAPI DI/lifespan/OpenAPI compose explicitly without taking over the host app. |
+| D18 | SQL-only infrastructure is the baseline; operational configuration and keys are still required. |
+| D19 | Mandatory service checks remain authoritative with every configured provider. |
+| D20 | Programmatic Alembic manages reviewed revisions; production startup checks and does not infer/apply DDL. |
+| D21 | Custom claims are a later token-adapter feature; separate metadata cannot override reserved fields. |
+| D22 | MVP uses opaque SQL browser sessions and separate revocable service-account API tokens. |
+| D23 | Revocation, rate limits, CSRF, bootstrap/recovery, and audit failure behavior are MVP gates. |
+| D24 | Environment aliases are the read-only MVP secret provider; encrypted SQL has a separate later release gate. |
+| D25 | MVP is single-realm; arbitrary tenant metadata does not establish isolation. |
+| D26 | Delegation is generic actor/effective-principal assumption; consumers own workload approvals and execution constraints. |
+| D27 | No check can retract an already released secret or atomically cancel external I/O. |
 
-- session vs JWT/refresh-token default;
-- exact password-hashing parameters;
-- encrypted database secret-store design;
-- resource-scope inheritance rules;
-- role/permission registration by consumer packages;
-- service-account credential binding representation;
-- audit retention/export;
-- external authenticator protocol;
-- optional Hedron integration packaging;
-- migration coordination when AuthMate and ShuETL share a database;
-- exact supported set of extensible persistence models;
-- managed migration revision storage/versioning;
-- safe-vs-unsafe automatic DDL classification;
-- lifecycle hook ordering/transaction semantics;
-- reserved token claim registry and custom-claim collision policy.
+## Rationale for revised decisions
 
-## D14 — Reuse mature security mechanics
+D09/D12/D26 preserve AuthMate's broad purpose: ShuETL/Hedron and other consumers
+implement its contracts and own their domain constraints. A conformance kit proves
+AuthMate independently; actual adapter compatibility needs separate versioned evidence.
+There are no core workload version records, schedule rules, or consumer callbacks.
 
-AuthMate owns identity/security semantics but delegates commodity mechanics to maintained libraries. Initial choices: `pwdlib[argon2]`, `cryptography`, `itsdangerous`, `pydantic-settings`, optional Authlib, and optional Casbin.
+D20 retains managed migrations and custom models while removing the assumption that
+nullable additions/indexes/constraints are universally safe to execute at startup.
+Migrations are reviewed release artifacts applied by one migrator. See [Migrations](MIGRATIONS.md).
 
-## D15 — Pydantic is the public contract layer
+D21/D22 resolve the open session-versus-JWT decision in favor of current SQL state
+and straightforward revocation. Custom token signing/refresh machinery is deferred;
+server-side typed metadata remains available without exposing claims to clients.
 
-AuthMate uses Pydantic for public/domain contracts, configuration, validation, serialization, extension payloads, and schema generation while SQLAlchemy remains available beneath persistence.
+D23/D24 make MVP scope unconditional. Baseline protections cannot wait for an
+operational-security phase, and a crypto review cannot silently change what ships.
+The environment provider supports a useful standalone release while encrypted storage
+gets a separate format/key-lifecycle design and test gate.
 
-## D16 — Prefer SQLModel for ordinary persisted entities
+## Implementation decisions to resolve in Phase 0
 
-AuthMate uses SQLModel as the default persistence modeling layer where it cleanly combines Pydantic and SQLAlchemy, retaining direct SQLAlchemy for advanced cases.
+These are concrete engineering gates, not permission to weaken the decisions above:
 
-Developer-extensible persisted entities should normally inherit from AuthMate non-table SQLModel base models and define the effective table model themselves. Avoid relying on accidental SQLAlchemy mapped-table inheritance semantics.
+- Exact SQL constraints/indexes and guard-lock query ordering; prove concurrency on
+  PostgreSQL and local serialized-write behavior on SQLite.
+- Versioned public protocol signatures, full registered permission catalog, and
+  immutable/custom model registry construction.
+- Tested Python/library/database support matrix and selected async driver versions.
+- Benchmarked password hash/rate/lock/size budgets and startup error behavior.
+- Packaged core/extension revision layout and supported upgrade/schema ranges.
+- Operator retention/storage policy, recovery drill, and release evidence format.
 
-## D17 — FastAPI is the runtime integration substrate
-
-AuthMate directly uses FastAPI DI, security primitives, lifespan, OpenAPI, exception handling, and dependency overrides instead of duplicating those mechanisms.
-
-## D18 — SQL-only infrastructure baseline
-
-AuthMate's default production deployment requires only the FastAPI application process and a relational SQL database. External identity providers, secret managers, caches, and messaging systems may extend AuthMate but cannot become baseline requirements.
-
-## D19 — Secure defaults, extensible by contract
-
-**Decision:** Every major AuthMate subsystem should expose a stable typed extension surface where practical, including persisted model metadata, authentication, authorization, token claims, credential types, secret providers, audit metadata, and lifecycle behavior.
-
-**Reason:** AuthMate is an embeddable application capability and must adapt to host-application domain needs without forks or monkey-patching.
-
-**Constraint:** Extensions may not silently override AuthMate security-critical invariants.
-
-## D20 — Managed Alembic migrations for supported model extensions
-
-**Decision:** AuthMate invokes Alembic programmatically and provides a schema-management API so developers normally do not need the Alembic CLI for AuthMate-owned/customized tables.
-
-A safe automatic migration mode may apply validated additive changes. Destructive or ambiguous changes are blocked and surfaced as an explicit migration plan/error.
-
-**Reason:** developer-extensible SQLModel entities are substantially more useful when schema evolution remains part of the AuthMate developer experience.
-
-## D21 — Token claims are extensible but reserved claims are protected
-
-**Decision:** Access/session token payloads support Pydantic-derived custom claim models and typed resolvers.
-
-AuthMate retains authority over reserved claims and signing/expiry/audience/issuer/token-type invariants unless responsibility is explicitly transferred through a low-level provider contract.
+Future features need their own ADRs: encrypted secret format/key lifecycle, federation
+identity linking, JWT/refresh validation, tenant isolation, generalized hooks, and
+reliable audit export. No approval of those features is implied by this plan.

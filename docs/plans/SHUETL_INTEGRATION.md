@@ -1,41 +1,57 @@
-# ShuETL Integration
+# ShuETL Consumer Integration Notes
 
-ShuETL uses AuthMate for human authorization, service-account execution identity, credential delegation, secret resolution, and security auditing without depending on AuthMate ORM internals.
+## Direction of dependency
 
-## Execution chain
+AuthMate defines general identity, authorization, delegation, and credential
+contracts. ShuETL or a separately maintained consumer adapter implements those
+contracts. AuthMate core does not import ShuETL/ETLantic, model their operations,
+query their records, require callbacks into them, or wait for their release cycle.
+[Consumer Contracts](CONSUMER_CONTRACTS.md) is the normative AuthMate surface;
+this document is optional guidance for the consumer, not a core requirement.
 
-```text
-User
-  ↓ authorized to trigger
-ShuETL Pipeline
-  ↓ executes as
-ServiceAccount
-  ↓ authorized to use
-Credential
-  ↓ resolved through
-SecretProvider
-  ↓
-ETLantic connector/runtime
-```
+## Current consumer observation
 
-A ShuETL pipeline version may persist service-account and credential references, never resolved secrets.
+The sibling ShuETL checkout inspected on 2026-09-12 (`f5806be`) uses ETLantic's
+`Authorizer` and `etlantic_fastapi.auth.ContextFactory` / `PrincipalDependency`
+in `src/shuetl/providers.py`; its identity plan says ETLantic owns canonical
+control-plane and execution records. Its pyproject pins ETLantic packages to
+`0.51.0`. This explains why the old AuthMate plan's ShuETL-owned pipeline/run model
+was misplaced. It does not constrain AuthMate's public contracts or certify any
+released integration.
 
-## Manual runs
+The ShuETL-side adapter is responsible for translating authenticated AuthMate
+principals and decisions into its chosen upstream interfaces. It owns an explicit,
+versioned action/resource mapping and preserves consumer denial semantics. AuthMate
+accepts generic registered actions and ResourceRefs and need not know their origin.
 
-1. Authenticate the human.
-2. Authorize `shuetl.pipeline.run`.
-3. Create the durable run with triggering-principal metadata.
-4. Executor resolves the pipeline service account.
-5. Authorize that service account for each required credential.
-6. Resolve secrets just in time.
-7. Execute ETLantic.
-8. Persist only redacted reports/artifact references.
-9. Audit security-sensitive actions.
+## Responsibilities that stay with the consumer
 
-## Scheduled runs
+ShuETL/ETLantic must decide who may create/edit/trigger work, which execution account
+an approved workload can select, how immutable versions and input constraints bind
+that approval, how queued work is revalidated, and how schedules are revoked.
+A user with run permission must not be able to substitute an arbitrary account,
+credential, connector, or destination. These checks belong at the consumer's own
+submission/execution boundary, not in AuthMate workload tables or callbacks.
 
-Scheduled runs execute as the pipeline's explicit service account. A schedule never implicitly gains credential access.
+At execution the consumer supplies a verified AccessContext. For example, a dedicated
+executor principal may have `authmate.service_account.assume` on selected accounts;
+AuthMate checks that assumption and the effective account's exact credential grant.
+The consumer must restrict each job's account and credentials further according to
+its own approval records. AuthMate's assumption permission alone does not prove a
+job is approved. A triggering human can be separate audit context; the consumer
+owns whether later changes to that human's authority cancel queued/scheduled work.
 
-If a service account is disabled, credential revoked, or grant removed, the run blocks/fails before unsafe external I/O. Never silently fall back to application-global credentials.
+The consumer owns job transport authentication, trusted record loading, cancellation,
+external I/O, and redaction of its definitions/reports. It never stores resolved
+secrets or silently substitutes global credentials. AuthMate rechecks current
+identity/grant state at each resolution and documents that revocation cannot retract
+plaintext already released.
 
-ShuETL should consume `AuthorizationProvider`, `ServiceAccountProvider`, `CredentialResolver`, and `AuditSink` protocols.
+## Consumer-owned compatibility testing
+
+ShuETL or its adapter package should pin AuthMate and upstream versions and test
+identity mapping, denial propagation, account/credential substitution, stale queued
+work, schedule policy, secret redaction, and actor/effective-principal audit fields.
+AuthMate provides a provider-neutral conformance kit and standalone examples. It
+publishes no ShuETL compatibility claim until an adapter demonstrates it, but core
+AuthMate releases are never gated on ShuETL or ETLantic implementation changes.

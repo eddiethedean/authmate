@@ -1,80 +1,50 @@
 # Dependency Strategy
 
-## Principle
+AuthMate owns security semantics and public contracts while reusing maintained
+validation, SQL, password hashing, pagination, and optional protocol/crypto mechanics.
 
-AuthMate should own identity, authorization, credential, and service-account domain semantics while delegating commodity security and pagination mechanics to mature libraries.
+## MVP dependencies
 
-> **Own the contracts; reuse the mechanics.**
+| Dependency | Role |
+| --- | --- |
+| FastAPI | Routing, DI, request/security extraction, OpenAPI |
+| Pydantic v2, pydantic-settings | Explicit public/config/extension validation |
+| SQLModel, SQLAlchemy 2, Alembic | Internal tables, async transactions, reviewed migrations |
+| pwdlib[argon2] | Explicitly configured Argon2id hashing/verification/rehash |
+| fastapi-pagination | Collection-query mechanics behind AuthMate-owned Page schemas |
+| aiosqlite (development extra) | Async SQLite local-development driver |
+| psycopg with async support (PostgreSQL extra) | Production reference database driver |
 
-## Core dependencies
+Select compatible versions and packaging/driver extras in Phase 0, then publish the
+exact tested matrix. Do not present the table as a verified lockfile. CI must test
+minimum-supported and current-compatible dependency sets. AuthMate's core package
+must import without optional provider/consumer dependencies installed.
 
-```text
-fastapi
-fastapi-pagination
-pydantic
-pydantic-settings
-sqlmodel
-sqlalchemy>=2
-alembic
-pwdlib[argon2]
-itsdangerous
-cryptography
-```
+Use standard-library CSPRNG and digest/constant-time primitives for opaque random
+tokens; this does not justify implementing custom ciphers, password hashes, or JWT
+validation. Opaque sessions need neither JWT signing nor itsdangerous.
 
-## fastapi-pagination
+Pagination always follows authorized query scoping. Public page/cursor/error models
+are owned by AuthMate; third-party pagination types are not stable domain contracts.
+Restrict totals and list visibility as specified in [API Design](API_DESIGN.md).
 
-Use `fastapi-pagination` for bounded collection APIs such as users, roles, service accounts, credentials, grants, sessions where applicable, and audit events.
+## Optional/future dependencies
 
-AuthMate owns authorization, filtering rules, resource visibility, and response semantics. `fastapi-pagination` owns pagination mechanics and SQLModel/SQLAlchemy integration.
+`cryptography` belongs to the separately gated encrypted SQL provider. Authlib belongs
+to a future OIDC adapter. PyCasbin may back a later policy adapter if requirements
+justify it. `itsdangerous` can support a future bounded signed application token,
+but does not provide one-time consumption/revocation by itself and is not an MVP
+session dependency. Consumer adapters depend on AuthMate and their consumer packages;
+core does not depend on Hedron/ShuETL/ETLantic.
 
-Pagination must occur after authorization/query scoping so totals and page contents cannot leak records the principal is not allowed to discover.
+All optional imports are lazy and missing extras produce actionable safe errors.
+Every provider must pass the same security/lifecycle conformance checks. Dependency
+upgrades require changelog/advisory review and the relevant regression suite. Reusing
+a library does not transfer responsibility for correct configuration or integration.
 
-Do not expose dependency-specific implementation types as AuthMate domain contracts.
+## Infrastructure rule
 
-### pwdlib[argon2]
-Use for password hashing and verification. AuthMate owns password lifecycle and policy; `pwdlib` owns hashing mechanics.
-
-### itsdangerous
-Use for bounded signed, time-limited application tokens such as invitation, email-verification, and password-reset tokens.
-
-### cryptography
-Use for any AuthMate-managed encrypted-secret provider. Never implement custom cryptographic primitives.
-
-### pydantic-settings
-Use for configuration and supported environment/secret-source loading where semantics fit.
-
-## Optional dependencies
-
-### Authlib
-Package as `authmate[oidc]` for OAuth2/OpenID Connect protocol mechanics.
-
-### PyCasbin
-Package as `authmate[casbin]` for advanced authorization behind the stable `AuthorizationProvider` contract.
-
-## Reference-only libraries
-
-FastAPI Users is useful to study for registration/reset/verification/authentication patterns, but AuthMate should not be architected around its internals.
-
-AuthX may be studied for JWT/cookie/CSRF/token handling patterns but is not a core dependency because it overlaps AuthMate's domain responsibilities.
-
-## Rules
-
-- Public AuthMate contracts never expose third-party implementation types.
-- Optional libraries are imported lazily.
-- Missing extras produce actionable install guidance.
-- Every backend conforms to the same AuthMate contracts.
-- Security dependency upgrades receive explicit review.
-
-## SQLModel
-
-Prefer `sqlmodel` for ordinary persisted AuthMate entities because it aligns naturally with FastAPI/Pydantic while retaining SQLAlchemy underneath.
-
-Keep direct `sqlalchemy` available for low-level session/transaction/query/security mechanics and Alembic migrations.
-
-## Infrastructure dependency rule
-
-Python package dependencies are allowed when they run in-process. The restriction applies to **external infrastructure/services**, not libraries.
-
-Allowed defaults include FastAPI, `fastapi-pagination`, Pydantic, SQLModel, SQLAlchemy, cryptography, and other in-process libraries.
-
-Redis, RabbitMQ, Kafka, OpenSearch/Elasticsearch, object storage, Vault/cloud secret managers, external schedulers, and separate workers cannot be required baseline infrastructure. Optional adapters may support them.
+In-process Python libraries are permitted. Redis, brokers, external identity/secret
+managers, external schedulers, and separate worker services are never necessary for
+baseline correctness. Runtime security state and mandatory audit live in SQL. The
+host still provisions TLS, configuration, keys when needed, and operational maintenance.

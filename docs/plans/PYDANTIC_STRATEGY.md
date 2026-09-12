@@ -1,61 +1,36 @@
 # Pydantic Strategy
 
-## Principle
+Pydantic v2 defines public/domain values, requests/responses, settings, principal and
+resource references, decisions, provider/config unions, audit metadata, and versioned
+JSON Schema. SQLModel/SQLAlchemy persistence models never become public responses.
+Explicit public schemas also prevent accidental exposure when a custom column is added.
 
-AuthMate should fully exploit Pydantic as the public modeling and validation layer already aligned with FastAPI.
+Use immutable reference/context models and strict security-field validation where
+coercion is unsafe. Request models reject unknown/reserved fields; PATCH uses explicit
+editable-field schemas. Values supplied by clients are never trusted authentication
+merely because a Pydantic model accepted their types. SQL uniqueness, foreign keys,
+transactional authorization, and concurrency invariants cannot be proved by model
+validators alone.
 
-> **Pydantic is the contract layer; SQLAlchemy is the persistence layer.**
+Provider/credential unions use registered discriminators frozen at startup. Duplicate
+names/types and aliases colliding with reserved fields are errors. Use TypeAdapter
+for boundary validation and version public schemas independently of ORM layout.
+Pydantic models/settings are an intentional public dependency; third-party backend
+and pagination implementation objects are not part of the public domain contract.
 
-## Use Pydantic for
+Use SecretStr/SecretBytes for sensitive inputs where helpful, but masking is not a
+guarantee against validation errors, custom serializers, tracing, or explicit unwrap.
+Use separate response schemas that omit sensitive fields entirely. Sanitize validation
+errors before logging or returning them, dropping input/context that may contain a
+password or provider configuration. No generated schema example/default includes
+real credentials. Resolved SecretValue is a deliberately non-serializable internal
+wrapper, not a normal response model with a masked field.
 
-- request and response models;
-- public domain records;
-- provider configuration;
-- principal/resource references;
-- authorization decisions;
-- credential metadata;
-- discriminated unions for credential/provider types;
-- secret-safe serialization;
-- validation constraints;
-- JSON Schema/OpenAPI generation;
-- settings through `pydantic-settings`;
-- serialization boundaries between adapters/providers;
-- versioned event/audit payloads.
+Use pydantic-settings for configuration, origins, proxy trust, SQL connections, session
+limits, and operator-controlled provider aliases. Configuration loads no arbitrary
+Python import path from HTTP/tenant metadata. Sensitive settings have redacted reprs.
 
-## Model boundaries
-
-SQLAlchemy ORM models must not leak directly through FastAPI responses. Use explicit Pydantic models between persistence and public APIs.
-
-## Discriminated unions
-
-Use tagged unions for extensible credential, secret-provider, and external-authenticator configurations with stable discriminator fields.
-
-## Secret handling
-
-Use Pydantic secret types where appropriate for write-only sensitive inputs, while ensuring secrets are never serialized into normal responses, reprs, logs, audit metadata, or OpenAPI examples.
-
-## Validation
-
-Use `Field`, `Annotated`, constrained metadata, field validators, and model validators for cross-field invariants. Prefer declarative Pydantic constraints over ad-hoc endpoint validation.
-
-## Settings
-
-Use `BaseSettings` from `pydantic-settings` for database configuration, token/session configuration, cryptographic key references, external provider configuration, and environment-specific policy.
-
-## JSON Schema
-
-Treat generated JSON Schema as a supported artifact for OpenAPI, configuration tooling, admin UI generation, compatibility checks, and documentation.
-
-## TypeAdapter
-
-Use `TypeAdapter` at adapter/plugin boundaries when validating arbitrary Pydantic-compatible payloads without inventing wrapper models.
-
-## Stability rule
-
-Public Pydantic models should be versioned carefully. Persistence/internal models may evolve independently.
-
-## SQLModel relationship
-
-For persisted AuthMate entities such as users, principals, roles, bindings, service accounts, credentials, and audit records, prefer SQLModel when one model can safely serve typed persistence and internal domain needs.
-
-Keep separate Pydantic request/response models when security or API-shape concerns require stricter separation, especially write-only password/secret inputs, public credential metadata, redacted audit output, administrator-only fields, and external provider payloads.
+Test request/response/schema snapshots, reserved-field injection, custom model field
+exposure, union collision handling, malformed secret-bearing inputs, and serialization
+through error/log/audit paths. Only narrow token-issuance/CSRF responses intentionally
+contain newly issued secret values; they are no-store and excluded from logging.

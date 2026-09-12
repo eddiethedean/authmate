@@ -1,80 +1,63 @@
 # AuthMate MVP
 
-## Objective
+## Objective and fixed scope
 
-Provide a production-credible FastAPI identity and credential layer that works standalone and composes cleanly with Hedron and ShuETL.
+Deliver a standalone, single-realm FastAPI identity and credential layer with tested
+public consumer contracts. This is a release target, not a claim of implemented
+security. All checkboxes below are open until implementation evidence exists.
 
-## Scope
+Include users, operator provisioning/recovery, opaque browser sessions, revocation,
+SQL rate limits, service accounts/API tokens, exact RBAC scopes, generic service-account
+assumption, credential metadata/exact grants, the read-only environment provider,
+durable SQL audit, FastAPI/Python service APIs, and reviewed managed migrations.
+Support typed user/service-account metadata, registered providers, and SQLite local /
+PostgreSQL production reference backends. One deployment is one security realm.
 
-- users and service accounts;
-- secure local authentication;
-- roles, permissions, resource-scoped bindings;
-- Python authorization API and FastAPI dependencies;
-- credential metadata and grants;
-- environment secret provider;
-- encrypted DB provider only if its crypto design is approved before freeze;
-- audit events;
-- SQLModel/SQLAlchemy + Alembic;
-- SQLite development and PostgreSQL production reference;
-- stable consumer protocols;
-- Hedron/ShuETL/full-stack compatibility CI.
+Exclude self-registration/email flows, JWT/refresh tokens, OIDC/MFA, groups/tenancy,
+policy languages, encrypted SQL secrets, writable-provider rotation, generalized
+lifecycle hooks, reliable remote audit export, and consumer-specific UI/workflow code.
+These are explicit follow-on work, not optional exceptions hidden inside MVP.
 
-## Acceptance criteria
+## Implementation and release gates
 
-- [ ] Mounts into an existing FastAPI app.
-- [ ] Users authenticate securely.
-- [ ] Disabled principals cannot authenticate or perform newly authorized work.
-- [ ] Generic resource refs support scoped RBAC.
-- [ ] FastAPI endpoints enforce permissions declaratively.
-- [ ] Background services authorize without HTTP request state.
-- [ ] Service accounts receive resource and credential permissions.
-- [ ] Secret resolution requires explicit authorization and is audited.
-- [ ] ShuETL can execute a pipeline as a service account using AuthMate credential references.
-- [ ] Hedron consumes principal/authorization APIs without AuthMate core importing Hedron.
-- [ ] One FastAPI app can mount Hedron + AuthMate + ShuETL.
-- [ ] PostgreSQL tests cover multi-replica security state.
-- [ ] OpenAPI/log/audit redaction tests prove secrets are not exposed.
+| ID | Required evidence |
+| --- | --- |
+| G01 | Composition: standalone and embedded FastAPI apps, two isolated instances, lifespan cleanup, direct background calls, host exception-handler preservation |
+| G02 | Authentication: Argon2id and bounded hashing; generic failures; password change/reset; concurrent single-use bootstrap; restricted temporary-password session |
+| G03 | Sessions/tokens: cookie/CSRF/login-CSRF protections; expiry, logout, epoch invalidation, wrong token type, ambiguous auth, one-time machine-token response |
+| G04 | Replica state: two independent instances sharing PostgreSQL observe committed revocations; simultaneous rate-limit reservations, disable versus release, role/grant changes |
+| G05 | Authorization: exact/type/realm scope matrix; unknown action/type denial; scope compatibility; forged IDs; reserved-field writes; no implicit owner/admin secret use; list/count visibility |
+| G06 | Delegation: actor needs exact account assumption; effective account needs independent permission/grant; disabled actor/account, forged actor IDs at transport boundaries, and transitive assumption denied |
+| G07 | Secrets: alias allowlist prevents arbitrary environment access; read-only capability errors; expiry, changed reference/version, unavailable provider, final recheck, bounded plaintext lifetime |
+| G08 | Audit: mutation+event atomicity; failed/denied attempt persistence; release-before-return ordering; SQL/provider failure and crash windows; truthful outcomes and bounded volume |
+| G09 | Redaction: real password/token/secret values absent from metadata, schema examples/defaults, validation errors, reprs, logging, tracing, audit, and fake-consumer reports; only intended issuance responses reveal new tokens |
+| G10 | Persistence: fresh install/upgrade, custom model selection without duplicate tables, reserved schema protection, concurrent migrators, interrupted upgrade, drift checks, unrelated-table preservation |
+| G11 | Operations: backup/restore with session/token invalidation and policy reconciliation; maintenance without correctness dependence; readiness failures; bounded lock/hash/login/provider load |
+| G12 | Public contract conformance: generic report consumer and background client; provider validation/failure/cancellation; stable error schemas; optional libraries and sibling packages absent |
 
-## Dependency requirements
+- [ ] G01–G12 pass with recorded commands, supported versions, and results.
+- [ ] SQLite parity and PostgreSQL concurrency tests both run in CI.
+- [ ] Release publishes supported Python/FastAPI/Pydantic/SQLModel/SQLAlchemy/database
+  versions and minimum/latest dependency test results.
+- [ ] An implementation threat-model review resolves critical/high findings; no
+  unchecked feature is described as production-ready.
+- [ ] Password/rate/size/session defaults are documented and load-tested.
+- [ ] Retention, migration lock budgets, recovery, and deployment configuration have
+  operator instructions and tested failure paths.
 
-- [ ] `pwdlib[argon2]` handles password hashing.
-- [ ] `cryptography` handles local encrypted-secret implementation.
-- [ ] `itsdangerous` or an ADR-approved equivalent handles bounded signed tokens.
-- [ ] `pydantic-settings` handles application configuration.
-- [ ] OAuth/OIDC remains optional behind an Authlib adapter.
-- [ ] Advanced authorization remains optional behind the provider contract.
+Actual Hedron/ShuETL/ETLantic compatibility is established by consumer-owned adapter
+suites. AuthMate's contract fakes do not certify those integrations, and missing
+consumer adapters do not block this standalone MVP.
 
-## Pydantic requirements
+## Dependency and framework gates
 
-- [ ] Public API/domain models use Pydantic rather than ORM objects.
-- [ ] Credential/provider configurations use discriminated unions.
-- [ ] Sensitive inputs use secret-safe Pydantic types/serialization rules.
-- [ ] Cross-field security invariants use model validation where appropriate.
-- [ ] Public JSON Schema/OpenAPI comes from the same Pydantic contracts.
-
-## SQLModel requirements
-
-- [ ] Persisted core entities use SQLModel where it improves clarity and avoids duplicate Pydantic/ORM models.
-- [ ] Sensitive API models remain separate when persistence models would expose fields that should not be serialized.
-- [ ] Direct SQLAlchemy is used for advanced transaction/locking/query cases.
-
-## FastAPI requirements
-
-- [ ] Routers compose cleanly into an existing FastAPI app.
-- [ ] DI is the primary runtime composition mechanism.
-- [ ] `Security()`/FastAPI security schemes are used where appropriate.
-- [ ] Request-scoped DB/provider resources use `yield` dependencies.
-- [ ] Long-lived resources use lifespan.
-- [ ] Strict content-type behavior remains enabled.
-- [ ] Stable custom exception handlers/error envelopes exist.
-- [ ] Dependency overrides support integration/security tests.
-
-## SQL-only infrastructure acceptance
-
-- [ ] Core production functionality requires only FastAPI + relational SQL.
-- [ ] SQLite supports local development.
-- [ ] PostgreSQL is the production reference backend.
-- [ ] Local authentication/RBAC/service accounts/audit require no external service.
-- [ ] Credential metadata and optional encrypted secret storage require no external secret manager.
-- [ ] External OIDC/secret-manager systems remain optional integrations.
-- [ ] No Redis/message broker/cache is required for correctness.
+- [ ] Public/domain models use Pydantic v2 with explicit input/output boundaries;
+  tagged provider/config unions and registry collision validation exist.
+- [ ] SQLModel is internal; SQLAlchemy async sessions have explicit service commits.
+- [ ] `pwdlib[argon2]`, `pydantic-settings`, and Alembic are configured explicitly.
+- [ ] Routers, Depends/Security, yield cleanup, lifespan, and dependency overrides
+  compose without installing a second framework or overriding host behavior.
+- [ ] JSON media-type behavior and sanitized errors are tested on supported FastAPI
+  versions; framework defaults alone are not evidence of CSRF protection.
+- [ ] Core requires no Redis, broker, external identity/secret manager, worker fleet,
+  or encrypted-provider dependency.

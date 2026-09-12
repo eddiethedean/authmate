@@ -1,122 +1,73 @@
 # Architecture
 
-```text
-FastAPI
-  ├── AuthMate router
-  └── Consumer routers
-          │
-          ▼
-     AuthMate services
-  ┌────────┼───────────┐
-Identity  Authorization Credentials
-  └────────┼───────────┘
-           ▼
-         Audit
-           ▼
-      Persistence
-           │
-      Secret Providers
-```
-
-## Public integration surfaces
-
-### FastAPI dependencies
-
-```python
-Depends(authmate.current_principal)
-Depends(authmate.require_authenticated())
-Depends(authmate.require_permission("shuetl.pipeline.run"))
-```
-
-### Python services
-
-```python
-await authmate.authorize(...)
-await authmate.require(...)
-await authmate.credentials.resolve(...)
-await authmate.audit.record(...)
-```
-
-### Stable protocols
-
-Consumers should type against interfaces such as `AuthorizationProvider`, `CredentialResolver`, `PrincipalProvider`, and `AuditSink`, not AuthMate ORM models.
-
-## Dependency direction
-
-AuthMate core never imports Hedron or ShuETL. Optional integration packages/extras may depend on both public APIs.
-
-## Persistence
-
-A combined deployment may share PostgreSQL while preserving table/migration ownership:
+AuthMate is an embeddable FastAPI identity, authorization, and credential package.
+It defines its own public contracts independently of consumer applications.
 
 ```text
-authmate_*
-shuetl_*
-application_*
+FastAPI routers/dependencies       Trusted Python/background callers
+                 \                  /
+                  AuthMate service facade
+                  /         |          \
+           Identity   Authorization   Credentials
+                  \         |          /
+                   SQL unit of work + audit
+                        |         \
+                   Persistence    Secret-provider adapters
 ```
 
-SQLite is supported for development; PostgreSQL is the production reference. Security correctness must not depend on process-local state.
+Mandatory checks live in service wrappers, so direct Python calls cannot accidentally
+skip rules enforced only by HTTP routes. Providers supply mechanisms behind those
+checks. Audit is part of each protected operation, not an asynchronous afterthought.
+Secret-provider I/O is bounded and happens outside held SQL write locks; release
+requires a final current-state check and committed audit event.
 
-## Ecosystem composition principle
+## Composition and contracts
 
-> **Independent by default, composable by contract.**
+FastAPI dependencies handle current identity, permission enforcement, and resource
+lookup. A resource-specific dependency must derive its ResourceRef from a trusted
+lookup; `require_permission("myapp.report.read")` without a resource is insufficient
+for an exact-resource action. Python `can`, `authorize`, `require`, and credential
+resolution use explicit context and do not need HTTP request state.
 
-AuthMate is independently deployable. Cross-package interoperability uses public FastAPI routers/DI, stable Python protocols, generic principal/resource references, optional adapters/extras, and documented integration contracts.
+[Consumer Contracts](CONSUMER_CONTRACTS.md) defines PrincipalRef, AccessContext,
+ResourceRef, decisions, provider protocols, and lifecycle/error semantics. Consumers
+register generic action/resource namespaces and adapt their own APIs to AuthMate.
+Core never imports Hedron, ShuETL, ETLantic, or their ORM/domain models. Their adapters
+and compatibility tests are consumer-owned and cannot block a core release.
 
-A feature is an architectural smell if AuthMate core must understand Hedron components, ShuETL pipelines, ETLantic plans, or another consumer-domain object where a generic contract would suffice.
+AuthMate owns identity/security semantics and reuses maintained hashing, validation,
+SQL, and optional cryptographic/protocol libraries behind implementation adapters.
+Public Pydantic values remain separate from persistence/provider objects. SQLModel
+models represent ordinary internal tables; SQLAlchemy handles explicit transactions,
+async sessions, locking, and advanced queries.
 
-## Dependency boundary
+## Deployment and state
 
-```text
-AuthMate API / protocols
-        ↓
-AuthMate services
-        ↓
-implementation adapters
-├── pwdlib
-├── cryptography
-├── Authlib
-└── optional Casbin
-```
+Default production deployment is one or more FastAPI processes plus PostgreSQL.
+SQLite is a local-development backend. SQL stores session/token digests, security
+state, roles/grants, credential metadata, rate-limit state, and durable audit. Correctness
+never relies on process-local positive caches, a cleanup timer, Redis, or a broker.
 
-Consumers never depend on those implementation libraries through AuthMate's public API.
+Environment-backed secret references are the MVP provider. External identity/secret
+services and the encrypted SQL provider are optional later capabilities. Process
+configuration, TLS, operator-provisioned secrets, backups, and reviewed migrations
+remain deployment responsibilities even though no additional service is mandatory.
 
-## Pydantic contract layer
+Each AuthMate instance has its own explicit configuration/provider registry and unit
+of work. No module-global current user, service locator, or shared request session.
+Host lifespan explicitly enters/closes AuthMate resources; failed startup cleans up
+partially opened providers. Async sessions never outlive their operation or cross
+concurrent tasks. See [FastAPI Strategy](FASTAPI_STRATEGY.md).
 
-```text
-FastAPI
-  ↓
-Pydantic public/domain contracts
-  ↓
-AuthMate services
-  ↓
-SQLAlchemy persistence / provider adapters
-```
+## Schema and isolation
 
-Pydantic models are the stable integration surface. ORM and provider-specific objects stay internal.
+AuthMate owns only its registered `authmate_*` tables and migration history, even
+when it shares a database with consumers. User/service-account metadata extensions
+use a validated model registry and reviewed migrations. Production startup verifies
+schema compatibility; it does not generate or automatically apply DDL. See
+[Persistence and Managed Migrations](MIGRATIONS.md).
 
-## SQLModel-first persistence strategy
-
-Use **SQLModel** by default where it cleanly unifies Pydantic domain models with relational persistence.
-
-> **Prefer SQLModel for ordinary persisted domain entities; use SQLAlchemy directly for advanced persistence mechanics.**
-
-SQLAlchemy remains available for complex joins/window queries, explicit transaction control, advisory locks/`SELECT ... FOR UPDATE`, bulk operations, engine/session configuration, backend-specific features, migrations, and performance-critical paths.
-
-Alembic remains the migration tool. Do not force SQLModel where plain Pydantic or direct SQLAlchemy is clearer.
-
-## FastAPI runtime composition
-
-Prefer FastAPI dependency injection over global state or service locators. Use `Security()` when OpenAPI scopes add value while provider-neutral resource authorization remains authoritative. Long-lived provider resources initialize through lifespan; request-scoped sessions/resources use `yield` dependencies.
-
-## Infrastructure baseline
-
-The default deployment is:
-
-```text
-FastAPI application
-        +
-relational SQL database
-```
-
-No other service is required for core functionality. Redis/RabbitMQ, Kafka, OpenSearch/Elasticsearch, object stores, Vault/cloud secret managers, external schedulers, and separate worker fleets are optional extensions only.
+MVP supports one security realm per deployment. Namespaces partition action names,
+not tenants. Generic resource strings or custom claims do not establish tenant
+isolation. Strong tenant boundaries require a future schema/contract design or
+separate deployments today.

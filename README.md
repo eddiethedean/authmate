@@ -1,60 +1,41 @@
 # AuthMate
 
-**AuthMate** is a FastAPI-native identity, authorization, service-account, credential, and secret-resolution layer.
+**AuthMate** is a planned FastAPI-native identity, authorization, service-account,
+credential, and secret-resolution package. It defines broadly useful public
+contracts that applications and adapters can consume independently.
 
-> **AuthMate gives FastAPI applications a composable security control plane for users, permissions, service identities, and delegated credentials.**
-
-AuthMate is designed to work standalone and to compose cleanly with other FastAPI-native applications such as Hedron and ShuETL.
-
-## Architecture principles
-
-- **Independent by default, composable by contract.**
-- **Own the contracts; reuse the mechanics.**
-- **Pydantic-first public contracts.**
-- **SQLModel where it cleanly fits; SQLAlchemy for advanced persistence mechanics.**
-- **FastAPI-native dependency injection, security, lifespan, and OpenAPI.**
-- **SQL-only infrastructure baseline** — core production functionality requires only the FastAPI application process and a relational SQL database.
-
-A reference composition is:
-
-```text
-FastAPI
-├── Hedron
-├── AuthMate
-├── ShuETL
-└── custom APIs
-```
-
-AuthMate core does not depend on Hedron or ShuETL and does not contain their domain logic.
+> Independent by default, composable by contract.
 
 ## Status
 
-AuthMate is currently in the architecture and planning phase.
+This repository currently contains architecture and implementation plans only.
+There is no AuthMate runtime package or passing implementation/security test suite.
+Start with the [planning index](docs/plans/README.md) and
+[critical review](docs/plans/PLAN_REVIEW.md).
 
-The complete design pack is in [`docs/plans/`](docs/plans/README.md).
+## Planned MVP
 
-## Planned capabilities
+- Users, operator provisioning, opaque SQL-backed browser sessions, and revocation.
+- Service accounts, revocable API tokens, and generic delegated identity.
+- Exact RBAC scopes, FastAPI dependencies, and Python service APIs.
+- Credential metadata, exact secret-use grants, and approved environment references.
+- Durable SQL audit, rate limiting, CSRF protection, and explicit recovery procedures.
+- Typed public contracts, controlled model/provider extensions, and reviewed migrations.
 
-- users and local authentication;
-- service accounts;
-- RBAC and resource-scoped permissions;
-- FastAPI `Depends` / `Security()` integration;
-- generic principal and resource references;
-- credential metadata and delegated credential use;
-- encrypted SQL-backed secret storage;
-- optional external secret providers and OIDC adapters;
-- audit events;
-- optional Hedron UI integration;
-- ShuETL execution-identity and credential integration.
+PostgreSQL is the production reference; SQLite supports local development. No Redis,
+broker, external identity service, or external secret manager is required. Encrypted
+SQL secret storage, federation, tenancy, and richer extensions have later release gates.
 
-## Default deployment goal
+## Architecture principles
 
-```text
-FastAPI application
-+
-PostgreSQL
-```
+- AuthMate owns its security semantics and public contracts; consumers adapt to them.
+- Mandatory service checks remain authoritative with custom providers.
+- Pydantic public contracts are separate from SQLModel/SQLAlchemy persistence.
+- FastAPI composition uses explicit DI, lifespan, security, and OpenAPI integration.
+- Core requires SQL-backed state, not process-local caches or additional services.
 
-SQLite should remain sufficient for local development.
-
-No Redis, message broker, external secret manager, or external identity service is required for core functionality.
+Hedron, ShuETL, and other applications may build optional adapters against AuthMate.
+Core contains no consumer workflow records, callbacks, domain imports, or release
+dependencies. Consumer-owned compatibility tests establish supported combinations.
+See [Consumer Contracts](docs/plans/CONSUMER_CONTRACTS.md) and
+[MVP gates](docs/plans/MVP.md).

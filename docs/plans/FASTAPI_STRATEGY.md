@@ -1,52 +1,55 @@
 # FastAPI Strategy
 
-## Principle
+Use FastAPI's routers, dependency injection, security extraction, lifespan, OpenAPI,
+and test overrides while keeping AuthMate usable through explicit Python services.
 
-AuthMate should use FastAPI as its runtime integration substrate rather than recreating routing, dependency injection, security-scheme plumbing, lifecycle hooks, OpenAPI, or testing overrides.
+## Integration contract
 
-## Required FastAPI features
+Expose APIRouter modules under one configurable prefix. The host includes them and
+explicitly enters AuthMate's async lifespan/context manager from its own lifespan.
+Do not assume mounting a subapplication automatically executes its lifespan; FastAPI
+documents lifespan execution for the main app.
+[Source: FastAPI lifespan](https://fastapi.tiangolo.com/advanced/events/).
+Test two AuthMate instances, shared host lifespan, failed initialization, and shutdown
+cleanup. Avoid global registry/session state and replacing host exception handlers.
 
-### APIRouter
-Expose AuthMate as composable routers with clear prefixes/tags.
+Use Depends/Annotated for authenticated actor, AccessContext, resource lookup,
+services, and request unit-of-work access. Dependencies adapt HTTP to domain services;
+security enforcement also runs inside services. Background operations receive
+explicit context and fresh sessions, never a captured request/session object.
 
-### Dependency injection
-Use `Depends` and `Annotated` for current principal, database/session access, authorization provider, credential resolver, audit sink, and external authenticator/provider clients.
+`yield` closes request resources, but protected writes and audit commit before the
+service returns success. Long-lived provider clients belong to lifespan. Blocking
+password hashes/SDK calls run off the event loop with bounded concurrency. ORM
+sessions are never reused by concurrent tasks.
 
-FastAPI dependency injection is the preferred runtime composition mechanism.
+## Security and schemas
 
-### Security()
-Use `Security()` where OAuth/OpenAPI scopes map cleanly to AuthMate permissions. Scopes must not replace AuthMate's resource-scoped authorization model.
+Document browser cookies and machine HTTP bearer authentication as separate schemes.
+Use Security() and FastAPI extraction helpers where useful; declaring a scheme or
+OAuth scope does not implement token validation or exact-resource authorization.
+Resource-specific dependencies build references from trusted consumer lookups.
 
-### Router-level dependencies
-Use router-level dependencies for broad management/security boundaries, then endpoint/service checks for resource-specific permissions.
+Keep strict JSON Content-Type validation; explicitly enforce/test the expected media
+types and 415 error contract for supported versions instead of relying only on a
+host setting. FastAPI documents strict JSON handling as its current default.
+[Source: FastAPI strict content type](https://fastapi.tiangolo.com/advanced/strict-content-type/).
+This does not replace origin/CSRF/session checks in [Authentication](AUTHENTICATION.md).
 
-### yield dependencies
-Use `yield` dependencies for request-scoped SQLModel/SQLAlchemy sessions and short-lived provider resources.
+Separate input/output Pydantic models. Passwords and credential values are write-only;
+new service-account tokens and CSRF values have narrow intentional response schemas
+with no-store headers. No ordinary metadata/validation/error schema contains them.
+Configure AuthMate-route validation/error translation to strip raw rejected input
+and provider errors. Preserve the host's handling for unrelated routes; integration
+may use a scoped route wrapper rather than a global validation-handler replacement.
 
-### Lifespan
-Use FastAPI lifespan for startup/shutdown of long-lived provider clients and AuthMate service resources.
+OpenAPI publishes truthful schemes, errors, bounded pagination, and response models.
+AuthMate's resource/grant semantics stay authoritative when OpenAPI cannot express
+them. Schema generation never invokes providers or claims resolvers with real secrets.
 
-### Security schemes
-Reuse FastAPI-native bearer/API-key/OAuth2/OpenID Connect security primitives rather than inventing custom token-extraction middleware.
+## Verification
 
-### Separate input/output models
-Security-sensitive APIs use explicit input/output Pydantic models. Passwords, tokens, and secret material are write-only and never appear in response schemas.
-
-### Strict content type
-Keep FastAPI strict content-type behavior enabled unless a documented compatibility requirement says otherwise.
-
-### Exception handling
-Define a stable AuthMate error envelope and map AuthMate exceptions plus request-validation errors through custom handlers.
-
-### OpenAPI
-Treat OpenAPI as a product surface for security requirements, response models, scopes, SDK generation, and carefully scoped `x-authmate-*` metadata where standard OpenAPI is insufficient.
-
-### Testing
-Use FastAPI dependency overrides for fake identity providers, credential resolvers, audit sinks, and database/session fixtures.
-
-## Do not misuse
-
-- Do not implement resource authorization in global middleware when DI/service checks are sufficient.
-- Do not rely on UI visibility as authorization.
-- Do not disable strict content-type checking casually.
-- Do not expose provider-specific security objects in response models.
+Use dependency overrides for fake identities, providers, sessions, and audit faults.
+Test authorization inside direct service calls as well as through routes. Test
+cookie/origin/CSRF behavior, wrong/ambiguous mechanisms, validation redaction, host
+handler isolation, cancellation, and proper commits before responses.
