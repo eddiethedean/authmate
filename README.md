@@ -16,6 +16,7 @@ public contract and release boundary.
 ## Supported runtime
 
 Python 3.11 through 3.14. Install this checkout with `uv sync --group dev`.
+AuthMate is distributed under the [MIT License](LICENSE).
 
 ## Quick start
 

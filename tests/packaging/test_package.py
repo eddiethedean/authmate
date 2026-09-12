@@ -1,5 +1,6 @@
 import subprocess
 import sys
+from importlib.metadata import metadata
 
 import authmate
 
@@ -7,6 +8,7 @@ import authmate
 def test_public_version_and_import_boundary() -> None:
     assert authmate.__version__ == "0.1.0"
     assert "AuthMate" in authmate.__all__
+    assert metadata("authmate")["License-Expression"] == "MIT"
 
 
 def test_malformed_provider_fixture_fails_static_contract_check() -> None:

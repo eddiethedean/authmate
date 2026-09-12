@@ -26,9 +26,8 @@ The repository was inspected at commit `94fb867` on 2026-09-12.
   from consumer projects.
 - Existing plans do not select a Python version range or concrete phase `0.1`
   dependency versions. This plan selects them below.
-- There is no repository license. This does not block building and testing an
-  internal preview, but it blocks a responsible public package publication. Follow-up
-  issue: [#1](https://github.com/eddiethedean/authmate/issues/1).
+- The repository now carries the MIT License in `LICENSE` and matching PEP 639
+  metadata; issue [#1](https://github.com/eddiethedean/authmate/issues/1) is resolved.
 
 Current upstream package metadata supports the selected runtime range:
 [FastAPI](https://pypi.org/project/fastapi/) `0.140+` supports Python 3.10+, and
@@ -132,8 +131,7 @@ persist policy, implement RBAC, or manage credentials.
 - Hedron, ShuETL, ETLantic, or any other consumer-specific adapter or test dependency.
 - Stable `1.0` compatibility, PyPI publication, release automation, benchmarks, or
   production-readiness claims.
-- Fixing unrelated repository governance or documentation concerns, including the
-  license decision tracked in issue #1.
+- Fixing unrelated repository governance or documentation concerns.
 
 ## Touched surface
 
@@ -829,10 +827,8 @@ No production defects can be identified because there is no implementation. Miss
 package, tests, examples, dependency metadata, and CI are direct phase `0.1` scope,
 not pre-existing failures exempt from the definition of done.
 
-The public repository lacks a license. GitHub had no duplicate open issue, so this
-is tracked separately in [issue #1](https://github.com/eddiethedean/authmate/issues/1).
-It does not expand implementation scope and does not require Luna to choose a license.
-It blocks public distribution, not local build/test completion.
+The repository license was a pre-existing governance gap. It is now resolved by the
+root MIT License and matching package metadata.
 
 ## Known follow-up candidates
 
@@ -844,7 +840,6 @@ It blocks public distribution, not local build/test completion.
   API tokens, and durable audit.
 - `0.6`: stable HTTP management surface, public conformance kit, and operational MVP
   evidence.
-- Governance: resolve repository/package licensing in issue #1 before public release.
 
 These candidates are not required for any `0.1` acceptance criterion.
 
@@ -857,7 +852,7 @@ critical/high issue attributable to this phase remains.
 
 Failures independently confirmed outside this boundary may be documented and tracked
 without expanding the release. Absence of persistence, authentication, RBAC, real
-secret management, consumer adapters, a license decision, or global repository
-perfection does not make this bounded contract incomplete.
+secret management, consumer adapters, or global repository perfection does not make
+this bounded contract incomplete.
 
 ## READY FOR IMPLEMENTATION
