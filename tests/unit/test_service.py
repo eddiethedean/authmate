@@ -1,11 +1,20 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 
-from authmate import AccessContext, AuthMate, AuthorizationDecision, DecisionReason, ResourceRef
+from authmate import (
+    AccessContext,
+    AuthMate,
+    AuthorizationDecision,
+    DecisionReason,
+    PrincipalRecord,
+    ResourceRef,
+)
 from authmate.errors import (
     AuthMateClosedError,
+    AuthMateUnavailableError,
     AuthorizationDeniedError,
     InvalidAuthorizationRequestError,
 )
@@ -249,6 +258,77 @@ async def test_wrong_provider_objects_cannot_become_valid_models() -> None:
     )
     result = await service.authorize(context=AccessContext(actor=record.ref), action="report.read")
     assert result.reason.value == "provider_contract_violation"
+    await service.aclose()
+
+
+@pytest.mark.asyncio
+async def test_provider_model_normalization_exceptions_are_contract_violations() -> None:
+    record = principal()
+    resource = ResourceRef(type="report.document", id="r-1")
+
+    class RaisingRecord(PrincipalRecord):
+        def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+            raise RuntimeError("principal provider detail")
+
+    class RaisingDecision(AuthorizationDecision):
+        def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+            raise ValueError("authorization provider detail")
+
+    class CancellingDecision(AuthorizationDecision):
+        def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+            raise asyncio.CancelledError()
+
+    service = AuthMate(
+        principal_provider=FakePrincipalProvider(
+            RaisingRecord(ref=record.ref, display_name="Ada", enabled=True)
+        ),
+        authorization_provider=FakeAuthorizationProvider(None),
+    )
+    result = await service.authorize(
+        context=AccessContext(actor=record.ref), action="report.read", resource=resource
+    )
+    assert result.reason is DecisionReason.PROVIDER_CONTRACT_VIOLATION
+    assert result.action == "report.read" and result.resource == resource
+    with pytest.raises(AuthMateUnavailableError) as error:
+        await service.require(
+            context=AccessContext(actor=record.ref), action="report.read", resource=resource
+        )
+    assert str(error.value) == "authorization service unavailable"
+    await service.aclose()
+
+    service = AuthMate(
+        principal_provider=FakePrincipalProvider(record),
+        authorization_provider=FakeAuthorizationProvider(
+            CancellingDecision(
+                allowed=True,
+                reason=DecisionReason.ALLOWED,
+                action="report.read",
+                resource=resource,
+            )
+        ),
+    )
+    with pytest.raises(asyncio.CancelledError):
+        await service.authorize(
+            context=AccessContext(actor=record.ref), action="report.read", resource=resource
+        )
+    await service.aclose()
+
+    service = AuthMate(
+        principal_provider=FakePrincipalProvider(record),
+        authorization_provider=FakeAuthorizationProvider(
+            RaisingDecision(
+                allowed=True,
+                reason=DecisionReason.ALLOWED,
+                action="report.read",
+                resource=resource,
+            )
+        ),
+    )
+    result = await service.authorize(
+        context=AccessContext(actor=record.ref), action="report.read", resource=resource
+    )
+    assert result.reason is DecisionReason.PROVIDER_CONTRACT_VIOLATION
+    assert result.action == "report.read" and result.resource == resource
     await service.aclose()
 
 

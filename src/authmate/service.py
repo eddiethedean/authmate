@@ -147,7 +147,7 @@ class AuthMate:
             )
         try:
             record = PrincipalRecord.model_validate(record.model_dump(mode="python"))
-        except (AttributeError, TypeError, ValidationError) as exc:
+        except Exception as exc:
             del exc
             return self._deny(valid_action, resource, DecisionReason.PROVIDER_CONTRACT_VIOLATION)
         if record.ref != context.actor:
@@ -179,7 +179,7 @@ class AuthMate:
             )
         try:
             decision = AuthorizationDecision.model_validate(decision.model_dump(mode="python"))
-        except (AttributeError, TypeError, ValidationError) as exc:
+        except Exception as exc:
             del exc
             return self._deny(valid_action, resource, DecisionReason.PROVIDER_CONTRACT_VIOLATION)
         if decision.action != valid_action or decision.resource != resource:
