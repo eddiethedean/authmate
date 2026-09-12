@@ -16,6 +16,7 @@ marked complete. See [review findings and fixes](PLAN_REVIEW.md).
 | [Design Decisions](DESIGN_DECISIONS.md) | Selected decisions and remaining Phase 0 questions |
 | [MVP](MVP.md) | Fixed scope and required release evidence |
 | [Roadmap](ROADMAP.md) | Sequencing and later features |
+| [Phase 0.1 Implementation Plan](PHASE_0_1_IMPLEMENTATION_PLAN.md) | Bounded contract-preview implementation scope and acceptance criteria |
 | [Architecture](ARCHITECTURE.md) | Service boundaries and deployment |
 | [Consumer Contracts](CONSUMER_CONTRACTS.md) | AuthMate-owned public integration surface |
 | [Authentication](AUTHENTICATION.md) | Sessions, passwords, bootstrap, API tokens, CSRF, rate limits |

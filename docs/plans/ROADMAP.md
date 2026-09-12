@@ -14,6 +14,8 @@ and the applicable [MVP gates](MVP.md) have passing evidence.
 Define and exercise the smallest end-to-end AuthMate service without promising API
 stability.
 
+Implementation contract: [Phase 0.1 Architecture & Implementation Plan](PHASE_0_1_IMPLEMENTATION_PLAN.md).
+
 Scope:
 
 - Pydantic `PrincipalRef`, `ResourceRef`, `AccessContext`, and
