@@ -1,5 +1,10 @@
 # AuthMate
 
+[![PyPI](https://img.shields.io/pypi/v/authmate.svg)](https://pypi.org/project/authmate/)
+[![Python](https://img.shields.io/pypi/pyversions/authmate.svg)](https://pypi.org/project/authmate/)
+[![Check](https://github.com/eddiethedean/authmate/actions/workflows/check.yml/badge.svg)](https://github.com/eddiethedean/authmate/actions/workflows/check.yml)
+[![License](https://img.shields.io/pypi/l/authmate.svg)](LICENSE)
+
 AuthMate is a provider-neutral authorization boundary for Python services. Version
 0.1.0 is a stateless contract preview: it validates shared values, coordinates
 principal and authorization providers, and supplies a small FastAPI adapter. It
@@ -10,14 +15,20 @@ or provide a production-readiness guarantee.
 
 ## Status
 
-The phase 0.1 runtime is implemented under `src/authmate`. Read the
-[quickstart](docs/quickstart.md) and [planning index](docs/plans/README.md) for the
-public contract and release boundary.
+AuthMate 0.1.0 is published on [PyPI](https://pypi.org/project/authmate/0.1.0/).
+
+```sh
+python -m pip install authmate
+```
+
+Read the [quickstart](docs/quickstart.md) and [planning index](docs/plans/README.md)
+for the public contract and release boundary.
 
 ## Supported runtime
 
-Python 3.11 through 3.14. Install this checkout with `uv sync --group dev`.
-AuthMate is distributed under the [MIT License](LICENSE).
+Python 3.11 through 3.14. Set up a contributor checkout with
+`uv sync --frozen --group dev`. AuthMate is distributed under the
+[MIT License](LICENSE).
 
 ## Quick start
 

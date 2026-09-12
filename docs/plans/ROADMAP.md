@@ -5,11 +5,14 @@ leave a usable, testable foundation for the next one. A release may change publi
 contracts while the major version is `0`; consumers should pin a minor release and
 use the conformance suite when upgrading.
 
-The release numbers describe implementation milestones, not calendar dates. All
-milestones are planned. No release is production-ready until its stated exit checks
-and the applicable [MVP gates](MVP.md) have passing evidence.
+The release numbers describe implementation milestones, not calendar dates. Phase
+0.1 is released; later milestones are planned. No release is production-ready until
+its stated exit checks and the applicable [MVP gates](MVP.md) have passing evidence.
 
-## 0.1 — Contract preview
+## 0.1 — Contract preview (released)
+
+Released as [`v0.1.0`](https://github.com/eddiethedean/authmate/tree/v0.1.0) on
+2026-09-12 and published on [PyPI](https://pypi.org/project/authmate/0.1.0/).
 
 Define and exercise the smallest end-to-end AuthMate service without promising API
 stability.
